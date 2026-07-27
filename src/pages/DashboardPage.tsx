@@ -20,13 +20,15 @@ import {
   Info
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 const menuItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, current: true },
   { name: 'Registro de Vecinos', path: '/vecinos', icon: Users, current: false },
   { name: 'Registro de Planchas', path: '/planchas', icon: ClipboardList, current: false },
   { name: 'Registro de Votación', path: '/votacion', icon: CheckSquare, current: false },
   { name: 'Resultados', path: '/resultados', icon: BarChart3, current: false },
-  { name: 'Reportes', path: '/reportes', icon: FileText, current: false }, // <- AQUÍ SE AGREGÓ EL MÓDULO DE REPORTES
+  { name: 'Reportes', path: '/reportes', icon: FileText, current: false },
 ];
 
 const configItems = [
@@ -58,13 +60,13 @@ export const DashboardPage: React.FC = () => {
       const token = localStorage.getItem('token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // Consultas simultáneas a tus endpoints del backend (actualizado al puerto 3002)
+      // Consultas simultáneas a los endpoints del backend usando API_URL
       const [resVecinos, resPlanchas, resVotos, resVotosAlt, resResultados] = await Promise.all([
-        fetch('http://localhost:3002/api/vecinos', { headers }).catch(() => null),
-        fetch('http://localhost:3002/api/planchas', { headers }).catch(() => null),
-        fetch('http://localhost:3002/api/votacion', { headers }).catch(() => null),
-        fetch('http://localhost:3002/api/votos', { headers }).catch(() => null),
-        fetch('http://localhost:3002/api/resultados', { headers }).catch(() => null),
+        fetch(`${API_URL}/vecinos`, { headers }).catch(() => null),
+        fetch(`${API_URL}/planchas`, { headers }).catch(() => null),
+        fetch(`${API_URL}/votacion`, { headers }).catch(() => null),
+        fetch(`${API_URL}/votos`, { headers }).catch(() => null),
+        fetch(`${API_URL}/resultados`, { headers }).catch(() => null),
       ]);
 
       // 1. Procesar Vecinos
@@ -199,7 +201,6 @@ export const DashboardPage: React.FC = () => {
   return (
     <div className="h-screen flex overflow-hidden bg-neutral-50 text-neutral-800 font-sans">
       
-      {/* Sidebar Fijo, más delgado (w-56) y sin scroll (overflow-hidden) */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-56 bg-[#0a254a] text-neutral-200 overflow-hidden transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:shadow-lg flex flex-col justify-between`}>
         <div className="flex flex-col h-full">
           
@@ -226,10 +227,10 @@ export const DashboardPage: React.FC = () => {
                     </li>
                 ))}
                 </ul>
-            </div>
-            <div>
-               <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Configuración</h2>
-              <ul className="space-y-0.5">
+              </div>
+              <div>
+                 <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Configuración</h2>
+                <ul className="space-y-0.5">
                     {configItems.map((item) => (
                         <li key={item.name}>
                           <Link to={item.path} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:bg-neutral-700/50">
@@ -239,7 +240,7 @@ export const DashboardPage: React.FC = () => {
                         </li>
                     ))}
                 </ul>
-            </div>
+              </div>
           </nav>
 
           <div className="px-3 py-2.5 border-t border-neutral-700 text-center">
@@ -249,7 +250,6 @@ export const DashboardPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
           <div className="px-6 py-3 flex items-center justify-between">
