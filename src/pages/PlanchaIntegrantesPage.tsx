@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronLeft, UserPlus, Trash2, Loader2, ShieldAlert, Search, X } from 'lucide-react';
+import { api } from '../api/axios'; // Importamos la instancia centralizada de Axios
 
 interface Vecino {
   id: number;
@@ -82,52 +83,51 @@ export const PlanchaIntegrantesPage: React.FC = () => {
   const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
 
-      const resPlancha = await fetch(`http://localhost:3001/api/planchas/${id}`, { headers });
-      if (resPlancha.ok) {
-        const dataPlancha = await resPlancha.json();
-        setPlancha(dataPlancha);
+      // Peticiones con Axios (el interceptor ya inyecta el token automáticamente)
+      const [resPlancha, resCandidatos, resVecinos, resCargos] = await Promise.all([
+        api.get(`/planchas/${id}`).catch(() => ({ data: null })),
+        api.get('/candidatos'),
+        api.get('/vecinos'),
+        api.get('/cargos')
+      ]);
+
+      // Procesar Plancha
+      if (resPlancha.data) {
+        setPlancha(resPlancha.data);
       } else {
         setPlancha({ id: Number(id), nombreFrente: `Plancha #${id}`, color: 'N/D' });
       }
 
-      const resCandidatos = await fetch(`http://localhost:3001/api/candidatos`, { headers });
-      if (resCandidatos.ok) {
-        const dataCandidatos = await resCandidatos.json();
-        const listaCandidatos = Array.isArray(dataCandidatos) ? dataCandidatos : (dataCandidatos.data || []);
-        setTodosLosCandidatos(listaCandidatos);
-        
-        const filtradosPorPlancha = listaCandidatos.filter(
-          (c: any) => String(c.planchaId || c.plancha_id) === String(id)
-        );
-        setCandidatos(filtradosPorPlancha);
-      }
+      // Procesar Candidatos
+      const dataCandidatos = resCandidatos.data;
+      const listaCandidatos = Array.isArray(dataCandidatos) ? dataCandidatos : (dataCandidatos.data || []);
+      setTodosLosCandidatos(listaCandidatos);
+      
+      const filtradosPorPlancha = listaCandidatos.filter(
+        (c: any) => String(c.planchaId || c.plancha_id) === String(id)
+      );
+      setCandidatos(filtradosPorPlancha);
 
-      const resVecinos = await fetch('http://localhost:3001/api/vecinos', { headers });
-      if (resVecinos.ok) {
-        const dataVecinos = await resVecinos.json();
-        const listaVecinos = Array.isArray(dataVecinos) ? dataVecinos : (dataVecinos.data || []);
-        setVecinos(listaVecinos);
-      }
+      // Procesar Vecinos
+      const dataVecinos = resVecinos.data;
+      const listaVecinos = Array.isArray(dataVecinos) ? dataVecinos : (dataVecinos.data || []);
+      setVecinos(listaVecinos);
 
-      const resCargos = await fetch('http://localhost:3001/api/cargos', { headers });
-      if (resCargos.ok) {
-        const dataCargos = await resCargos.json();
-        setCargos(Array.isArray(dataCargos) ? dataCargos : (dataCargos.data || []));
-      }
+      // Procesar Cargos
+      const dataCargos = resCargos.data;
+      setCargos(Array.isArray(dataCargos) ? dataCargos : (dataCargos.data || []));
 
       setError(null);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Error al cargar los datos.');
+      setError(err.response?.data?.message || err.message || 'Error al cargar los datos.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Función universal actualizada con 'numero_carnet' como prioridad principal
+  // Función universal con 'numero_carnet' como prioridad principal
   const obtenerCi = (vecinoObj?: Vecino, candidatoObj?: Candidato): string => {
     if (vecinoObj) {
       const val = vecinoObj.numero_carnet || vecinoObj.ci || vecinoObj.nroCi || vecinoObj.nro_ci || vecinoObj.documento || vecinoObj.dni || vecinoObj.carnet;
@@ -186,31 +186,20 @@ export const PlanchaIntegrantesPage: React.FC = () => {
 
     try {
       setSubmitting(true);
-      const token = localStorage.getItem('token');
 
-      const response = await fetch('http://localhost:3001/api/candidatos', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          planchaId: Number(id),
-          vecinoId: Number(vecinoId),
-          cargoId: Number(cargoId)
-        })
+      // Usando Axios POST para registrar candidato
+      await api.post('/candidatos', {
+        planchaId: Number(id),
+        vecinoId: Number(vecinoId),
+        cargoId: Number(cargoId)
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Error al registrar el integrante.');
-      }
 
       handleLimpiarVecinoSeleccionado();
       setCargoId('');
       await cargarDatosIniciales();
     } catch (err: any) {
-      alert(`No se pudo registrar: ${err.message}`);
+      const mensaje = err.response?.data?.message || err.message || 'Error al registrar el integrante.';
+      alert(`No se pudo registrar: ${mensaje}`);
     } finally {
       setSubmitting(false);
     }
@@ -220,16 +209,12 @@ export const PlanchaIntegrantesPage: React.FC = () => {
     if (!window.confirm('¿Desea quitar a este integrante de la plancha?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/candidatos/${candidatoId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('No se pudo eliminar el registro.');
+      // Usando Axios DELETE
+      await api.delete(`/candidatos/${candidatoId}`);
       await cargarDatosIniciales();
     } catch (err: any) {
-      alert(`Error al eliminar: ${err.message}`);
+      const mensaje = err.response?.data?.message || err.message || 'No se pudo eliminar el registro.';
+      alert(`Error al eliminar: ${mensaje}`);
     }
   };
 

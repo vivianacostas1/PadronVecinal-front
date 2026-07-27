@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, BarChart3, PieChart, Award, Users, Loader2, ShieldAlert, LayoutList } from 'lucide-react';
+import { api } from '../api/axios'; // Importamos la instancia configurada de Axios
 
 interface Resultado {
   id: number;
@@ -29,20 +30,15 @@ export const ResultadosPage: React.FC = () => {
   const cargarResultados = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
 
+      // Usamos api.get en paralelo. Axios inyecta automáticamente el token de autorización.
       const [resResultados, resPlanchas] = await Promise.all([
-        fetch('http://localhost:3001/api/resultados', { headers }),
-        fetch('http://localhost:3001/api/planchas', { headers })
+        api.get('/resultados'),
+        api.get('/planchas')
       ]);
 
-      if (!resResultados.ok || !resPlanchas.ok) {
-        throw new Error('No se pudieron cargar los datos estadísticos.');
-      }
-
-      const dataResultados = await resResultados.json();
-      const dataPlanchas = await resPlanchas.json();
+      const dataResultados = resResultados.data;
+      const dataPlanchas = resPlanchas.data;
 
       const listaResultados = Array.isArray(dataResultados) ? dataResultados : (dataResultados.data || []);
       const listaPlanchas = Array.isArray(dataPlanchas) ? dataPlanchas : (dataPlanchas.data || []);
@@ -58,7 +54,9 @@ export const ResultadosPage: React.FC = () => {
       setResultados(resultadosConPlancha);
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Error al conectar con el servidor.');
+      console.error(err);
+      const mensajeError = err.response?.data?.message || err.message || 'Error al conectar con el servidor.';
+      setError(mensajeError);
     } finally {
       setLoading(false);
     }
@@ -294,6 +292,3 @@ export const ResultadosPage: React.FC = () => {
     </div>
   );
 };
-
-
-

@@ -23,6 +23,8 @@ import {
   LogOut 
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 const menuItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, current: false },
   { name: 'Registro de Vecinos', path: '/vecinos', icon: Users, current: false },
@@ -52,7 +54,6 @@ export const UsuariosPage: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Verificamos si el usuario actual es administrador
   const esAdministrador = user?.rol === 'administrador';
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -61,12 +62,10 @@ export const UsuariosPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Estados del Modal (Crear / Editar)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
   
-  // Estructura adaptada (solo roles permitidos en gestión general de usuarios)
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -83,7 +82,7 @@ export const UsuariosPage: React.FC = () => {
     setError(null);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/usuarios', {
+      const response = await fetch(`${API_URL}/usuarios`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -130,8 +129,8 @@ export const UsuariosPage: React.FC = () => {
     try {
       const token = localStorage.getItem('token');
       const url = editMode 
-        ? `http://localhost:3001/api/usuarios/${currentId}`
-        : 'http://localhost:3001/api/usuarios';
+        ? `${API_URL}/usuarios/${currentId}`
+        : `${API_URL}/usuarios`;
       
       const method = editMode ? 'PUT' : 'POST';
 
@@ -175,7 +174,7 @@ export const UsuariosPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/usuarios/${id}`, {
+      const response = await fetch(`${API_URL}/usuarios/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -215,7 +214,6 @@ export const UsuariosPage: React.FC = () => {
   return (
     <div className="h-screen flex overflow-hidden bg-neutral-50 text-neutral-800 font-sans">
       
-      {/* Sidebar Fijo */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#0a254a] text-neutral-200 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:shadow-lg`}>
         <div className="flex flex-col h-full">
           <div className="px-5 py-4 border-b border-neutral-700">
@@ -264,7 +262,6 @@ export const UsuariosPage: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col h-screen overflow-y-auto">
         <header className="bg-white border-b border-neutral-200 sticky top-0 z-30">
           <div className="px-6 py-3 flex items-center justify-between">
@@ -294,7 +291,6 @@ export const UsuariosPage: React.FC = () => {
                 {esAdministrador ? 'Administra los usuarios con acceso al sistema y sus roles.' : 'Visualización de usuarios registrados en el sistema (Modo Consulta).'}
               </p>
             </div>
-            {/* Botón de Nuevo Usuario exclusivo para Administradores */}
             {esAdministrador && (
               <button 
                 onClick={handleOpenCreateModal}
@@ -338,7 +334,6 @@ export const UsuariosPage: React.FC = () => {
                     <th className="py-3 px-4">Nombre</th>
                     <th className="py-3 px-4">Correo Electrónico</th>
                     <th className="py-3 px-4">Rol</th>
-                    {/* Columna de acciones solo visible para administradores */}
                     {esAdministrador && <th className="py-3 px-4 text-center">Acciones</th>}
                   </tr>
                 </thead>
@@ -366,7 +361,6 @@ export const UsuariosPage: React.FC = () => {
                             <Shield className="h-3 w-3" /> {formatearRol(u.rol)}
                           </span>
                         </td>
-                        {/* Botones de acción ocultos para Operador de Consultas */}
                         {esAdministrador && (
                           <td className="py-3.5 px-4 text-center">
                             <div className="flex items-center justify-center gap-2">
@@ -398,7 +392,6 @@ export const UsuariosPage: React.FC = () => {
         </main>
       </div>
 
-      {/* Modal restringido solo a administradores */}
       {isModalOpen && esAdministrador && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-neutral-100 animate-in fade-in zoom-in-95 duration-200">

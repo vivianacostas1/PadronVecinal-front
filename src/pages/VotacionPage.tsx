@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Loader2, ShieldAlert, CheckCircle2, BarChart3, Lock, AlertTriangle } from 'lucide-react';
+import { api } from '../api/axios'; // Importamos la instancia configurada de Axios
 
 interface Plancha {
   id: number;
@@ -56,24 +57,23 @@ export const VotacionPage: React.FC = () => {
   const verificarEstadoYcargarDatos = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const headers = { 'Authorization': `Bearer ${token}` };
 
-      const resResultados = await fetch('http://localhost:3001/api/resultados', { headers }).catch(() => null);
-      if (resResultados && resResultados.ok) {
-        const dataRes = await resResultados.json();
-        const listaRes = Array.isArray(dataRes) ? dataRes : (dataRes.data || []);
+      // Verificamos si ya existen resultados con la instancia api de Axios
+      try {
+        const resResultados = await api.get('/resultados');
+        const listaRes = Array.isArray(resResultados.data) ? resResultados.data : (resResultados.data?.data || []);
         if (listaRes.length > 0) {
           setVotacionCerrada(true);
           setLoading(false);
           return;
         }
+      } catch (err) {
+        // Si da error (ej. 404 o similar porque aún no hay resultados), continuamos cargando planchas
       }
 
-      const response = await fetch('http://localhost:3001/api/planchas', { headers });
-      if (!response.ok) throw new Error('No se pudo cargar la lista de planchas.');
-
-      const data = await response.json();
+      // Cargamos las planchas usando Axios
+      const response = await api.get('/planchas');
+      const data = response.data;
       const listaPlanchas: Plancha[] = Array.isArray(data) ? data : (data.data || []);
 
       const nulosObj = listaPlanchas.find(p => {
@@ -100,7 +100,8 @@ export const VotacionPage: React.FC = () => {
 
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Error al conectar con el servidor.');
+      console.error(err);
+      setError(err.response?.data?.message || err.message || 'Error al conectar con el servidor.');
     } finally {
       setLoading(false);
     }
@@ -113,13 +114,11 @@ export const VotacionPage: React.FC = () => {
     }));
   };
 
-  // Función que se ejecuta cuando el usuario hace clic en el botón inicial del formulario
   const handleSubmitClick = (e: React.FormEvent) => {
     e.preventDefault();
     setMostrarModalConfirmacion(true);
   };
 
-  // Función que realmente ejecuta el guardado tras confirmar en el modal
   const confirmarGuardarVotacion = async () => {
     setMostrarModalConfirmacion(false);
     setSubmitting(true);
@@ -127,7 +126,6 @@ export const VotacionPage: React.FC = () => {
     setSuccessMessage(null);
 
     try {
-      const token = localStorage.getItem('token');
       const usuarioStr = localStorage.getItem('usuario') || localStorage.getItem('user');
       let registradoPorId = 1; 
       
@@ -142,6 +140,7 @@ export const VotacionPage: React.FC = () => {
 
       const peticiones: Promise<any>[] = [];
 
+      // Mapeamos los votos de cada plancha real a peticiones POST usando Axios
       Object.keys(votosPorPlancha).forEach(pId => {
         const payload = {
           planchaId: Number(pId),
@@ -150,21 +149,11 @@ export const VotacionPage: React.FC = () => {
         };
 
         peticiones.push(
-          fetch('http://localhost:3001/api/resultados', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          }).then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al registrar la votación.');
-            return data;
-          })
+          api.post('/resultados', payload).then(res => res.data)
         );
       });
 
+      // Añadimos votos nulos si existen
       if (planchaNulosId !== null) {
         const payloadNulos = {
           planchaId: planchaNulosId,
@@ -173,21 +162,11 @@ export const VotacionPage: React.FC = () => {
         };
 
         peticiones.push(
-          fetch('http://localhost:3001/api/resultados', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payloadNulos)
-          }).then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al registrar votos nulos.');
-            return data;
-          })
+          api.post('/resultados', payloadNulos).then(res => res.data)
         );
       }
 
+      // Añadimos votos blancos si existen
       if (planchaBlancosId !== null) {
         const payloadBlancos = {
           planchaId: planchaBlancosId,
@@ -196,18 +175,7 @@ export const VotacionPage: React.FC = () => {
         };
 
         peticiones.push(
-          fetch('http://localhost:3001/api/resultados', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payloadBlancos)
-          }).then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Error al registrar votos blancos.');
-            return data;
-          })
+          api.post('/resultados', payloadBlancos).then(res => res.data)
         );
       }
 
@@ -216,7 +184,9 @@ export const VotacionPage: React.FC = () => {
       setSuccessMessage('¡Votación registrada exitosamente!');
       setVotacionCerrada(true);
     } catch (err: any) {
-      setError(err.message || 'Error al guardar los votos.');
+      console.error(err);
+      const mensaje = err.response?.data?.error || err.response?.data?.message || err.message || 'Error al guardar los votos.';
+      setError(mensaje);
     } finally {
       setSubmitting(false);
     }

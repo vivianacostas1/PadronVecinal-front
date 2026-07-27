@@ -12,6 +12,7 @@ import {
   Upload
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { api } from '../api/axios'; // Importamos la instancia configurada de Axios
 
 interface Vecino {
   id: number;
@@ -88,20 +89,10 @@ export const VecinosPage: React.FC = () => {
   const fetchVecinos = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token'); 
-
-      const response = await fetch('http://localhost:3001/api/vecinos', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo conectar con el servidor o la sesión expiró.');
-      }
-
-      const data = await response.json();
+      // Usamos api.get (Axios inyecta automáticamente el token de autorización)
+      const response = await api.get('/vecinos');
+      const data = response.data;
+      
       setVecinos(Array.isArray(data) ? data : data.data || []);
       setError(null);
     } catch (err: any) {
@@ -151,7 +142,6 @@ export const VecinosPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
       const currentUserId = obtenerUsuarioId();
 
       const datosAEnviar = {
@@ -159,32 +149,18 @@ export const VecinosPage: React.FC = () => {
         usuarioId: currentUserId
       };
 
-      const url = editandoId 
-        ? `http://localhost:3001/api/vecinos/${editandoId}` 
-        : 'http://localhost:3001/api/vecinos';
-      
-      const method = editandoId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(datosAEnviar)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Detalle del error del backend:", data);
-        throw new Error(data.message || 'Error al procesar la solicitud.');
+      if (editandoId) {
+        await api.put(`/vecinos/${editandoId}`, datosAEnviar);
+      } else {
+        await api.post('/vecinos', datosAEnviar);
       }
 
       await fetchVecinos();
       setIsModalOpen(false);
     } catch (err: any) {
-      alert(`No se pudo guardar: ${err.message}`);
+      console.error("Detalle del error:", err);
+      const mensaje = err.response?.data?.message || err.message || 'Error al procesar la solicitud.';
+      alert(`No se pudo guardar: ${mensaje}`);
     }
   };
 
@@ -194,21 +170,11 @@ export const VecinosPage: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/vecinos/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo eliminar el registro.');
-      }
-
+      await api.delete(`/vecinos/${id}`);
       await fetchVecinos();
     } catch (err: any) {
-      alert(`Error al eliminar: ${err.message}`);
+      const mensaje = err.response?.data?.message || err.message || 'No se pudo eliminar el registro.';
+      alert(`Error al eliminar: ${mensaje}`);
     }
   };
 
@@ -232,17 +198,11 @@ export const VecinosPage: React.FC = () => {
         }
 
         setLoading(true);
-        const token = localStorage.getItem('token');
         const currentUserId = obtenerUsuarioId();
 
-        // Obtener los carnets existentes en la BD para filtrado inteligente
-        const responseExistentes = await fetch('http://localhost:3001/api/vecinos', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const datosActuales = await responseExistentes.json();
+        // Obtener los carnets existentes en la BD mediante Axios
+        const responseExistentes = await api.get('/vecinos');
+        const datosActuales = responseExistentes.data;
         const listaVecinosActuales = Array.isArray(datosActuales) ? datosActuales : datosActuales.data || [];
         const carnetsEnBD = new Set(listaVecinosActuales.map((v: any) => String(v.numeroCarnet).trim()));
 
@@ -294,19 +254,7 @@ export const VecinosPage: React.FC = () => {
         });
 
         if (unicosParaEnviar.length > 0) {
-          const responseMasiva = await fetch('http://localhost:3001/api/vecinos/masivo', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ vecinos: unicosParaEnviar })
-          });
-
-          if (!responseMasiva.ok) {
-            const errData = await responseMasiva.json();
-            throw new Error(errData.message || 'Error al importar los registros únicos.');
-          }
+          await api.post('/vecinos/masivo', { vecinos: unicosParaEnviar });
         }
 
         if (filasDuplicadasParaExcel.length > 0) {
@@ -322,7 +270,8 @@ export const VecinosPage: React.FC = () => {
 
         await fetchVecinos();
       } catch (err: any) {
-        alert(`Error al procesar el archivo Excel: ${err.message}`);
+        const mensaje = err.response?.data?.message || err.message || 'Error desconocido';
+        alert(`Error al procesar el archivo Excel: ${mensaje}`);
       } finally {
         setLoading(false);
         if (e.target) e.target.value = '';

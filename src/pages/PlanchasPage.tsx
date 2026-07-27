@@ -10,6 +10,7 @@ import {
   Loader2,
   UserPlus
 } from 'lucide-react';
+import { api } from '../api/axios'; // Importamos la instancia configurada de Axios
 
 interface Plancha {
   id: number;
@@ -76,20 +77,9 @@ export const PlanchasPage: React.FC = () => {
   const fetchPlanchas = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token'); 
-
-      const response = await fetch('http://localhost:3001/api/planchas', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo conectar con el servidor o la sesión expiró.');
-      }
-
-      const data = await response.json();
+      // Ya no necesitamos extraer manualmente el token ni poner la URL completa, Axios lo maneja
+      const response = await api.get('/planchas');
+      const data = response.data;
       const listaPlanchas = Array.isArray(data) ? data : data.data || [];
 
       // Filtrar para ocultar Votos Blancos y Votos Nulos de la vista de planchas electorales
@@ -135,7 +125,6 @@ export const PlanchasPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const token = localStorage.getItem('token');
       const currentUserId = obtenerUsuarioId();
 
       const datosAEnviar = {
@@ -144,32 +133,18 @@ export const PlanchasPage: React.FC = () => {
         usuarioId: currentUserId
       };
 
-      const url = editandoId 
-        ? `http://localhost:3001/api/planchas/${editandoId}` 
-        : 'http://localhost:3001/api/planchas';
-      
-      const method = editandoId ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(datosAEnviar)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Detalle del error del backend:", data);
-        throw new Error(data.message || JSON.stringify(data) || 'Error al procesar la solicitud de la plancha.');
+      if (editandoId) {
+        await api.put(`/planchas/${editandoId}`, datosAEnviar);
+      } else {
+        await api.post('/planchas', datosAEnviar);
       }
 
       await fetchPlanchas();
       setIsModalOpen(false);
     } catch (err: any) {
-      alert(`No se pudo guardar: ${err.message}`);
+      console.error("Detalle del error:", err.response?.data);
+      const mensajeError = err.response?.data?.message || err.message || 'Error al procesar la solicitud de la plancha.';
+      alert(`No se pudo guardar: ${mensajeError}`);
     }
   };
 
@@ -179,21 +154,11 @@ export const PlanchasPage: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:3001/api/planchas/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('No se pudo eliminar el registro.');
-      }
-
+      await api.delete(`/planchas/${id}`);
       await fetchPlanchas();
     } catch (err: any) {
-      alert(`Error al eliminar: ${err.message}`);
+      const mensajeError = err.response?.data?.message || err.message || 'No se pudo eliminar el registro.';
+      alert(`Error al eliminar: ${mensajeError}`);
     }
   };
 
