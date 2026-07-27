@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Printer, ArrowLeft, Users, Layers, Loader2, ShieldAlert } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 interface Integrante {
   id: number;
   cargo?: { nombre: string };
@@ -49,8 +51,8 @@ export const ReportesPage: React.FC = () => {
       const headers = { 'Authorization': `Bearer ${token}` };
 
       const [resPlanchas, resVecinos] = await Promise.all([
-        fetch('http://localhost:3002/api/planchas', { headers }),
-        fetch('http://localhost:3002/api/vecinos', { headers })
+        fetch(`${API_URL}/planchas`, { headers }),
+        fetch(`${API_URL}/vecinos`, { headers })
       ]);
 
       if (!resPlanchas.ok || !resVecinos.ok) {

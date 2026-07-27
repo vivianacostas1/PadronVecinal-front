@@ -17,7 +17,8 @@ import {
   UserPlus,
   MailCheck,
   Building2,
-  Info
+  Info,
+  Briefcase
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -32,6 +33,7 @@ const menuItems = [
 ];
 
 const configItems = [
+  { name: 'Cargos', path: '/cargos', icon: Briefcase, current: false },
   { name: 'Usuarios', path: '/config/usuarios', icon: Settings, current: false },
 ];
 

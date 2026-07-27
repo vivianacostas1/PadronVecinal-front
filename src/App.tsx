@@ -10,6 +10,7 @@ import { ReportesPage } from './pages/ReportesPage';
 import { UsuariosPage } from './pages/UsuariosPage';
 import { ConfiguracionPage } from './pages/ConfiguracionPage';
 import { RespaldosPage } from './pages/RespaldosPage';
+import { CargosPage } from './pages/CargosPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export function App() {
@@ -24,13 +25,14 @@ export function App() {
         <Route path="/vecinos" element={<VecinosPage />} />
         <Route path="/planchas" element={<PlanchasPage />} />
         <Route path="/planchas/:id/integrantes" element={<PlanchaIntegrantesPage />} />
+        <Route path="/cargos" element={<CargosPage />} />
         <Route path="/votacion" element={<VotacionPage />} />
+        <Route path="/votacion/registrar" element={<VotacionPage />} />
         <Route path="/resultados" element={<ResultadosPage />} />
         <Route path="/reportes" element={<ReportesPage />} />
         <Route path="/config/usuarios" element={<UsuariosPage />} />
         <Route path="/configuracion" element={<ConfiguracionPage />} />
         <Route path="/config/respaldos" element={<RespaldosPage />} />
-        <Route path="/votacion/registrar" element={<VotacionPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />
