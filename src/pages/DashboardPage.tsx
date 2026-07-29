@@ -23,7 +23,7 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-const menuItems = [
+const initialMenuItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, current: true },
   { name: 'Registro de Vecinos', path: '/vecinos', icon: Users, current: false },
   { name: 'Registro de Planchas', path: '/planchas', icon: ClipboardList, current: false },
@@ -32,7 +32,7 @@ const menuItems = [
   { name: 'Reportes', path: '/reportes', icon: FileText, current: false },
 ];
 
-const configItems = [
+const initialConfigItems = [
   { name: 'Cargos', path: '/cargos', icon: Briefcase, current: false },
   { name: 'Usuarios', path: '/config/usuarios', icon: Settings, current: false },
 ];
@@ -42,11 +42,20 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Validación exacta basada en tu Prisma (RolUsuario: administrador, operador_consultas, vecino)
+  const userRole = (user as any)?.rol || '';
+  const isOperador = userRole === 'operador_consultas';
+
+  // Filtrar menús si es operador (se oculta Configuración de Usuarios)
+  const menuItems = initialMenuItems;
+  const configItems = isOperador 
+    ? initialConfigItems.filter(item => item.name !== 'Usuarios') 
+    : initialConfigItems;
+
   // Estados dinámicos para los contadores y mensajes
   const [totalVecinos, setTotalVecinos] = useState<string | number>('...');
   const [totalPlanchas, setTotalPlanchas] = useState<string | number>('...');
   
-  // Estados específicos para control de registros
   const [votacionRegistrada, setVotacionRegistrada] = useState<boolean>(false);
   const [totalVotantes, setTotalVotantes] = useState<string | number>('...');
 
@@ -62,7 +71,6 @@ export const DashboardPage: React.FC = () => {
       const token = localStorage.getItem('token');
       const headers = { 'Authorization': `Bearer ${token}` };
 
-      // Consultas simultáneas a los endpoints del backend usando API_URL
       const [resVecinos, resPlanchas, resVotos, resVotosAlt, resResultados] = await Promise.all([
         fetch(`${API_URL}/vecinos`, { headers }).catch(() => null),
         fetch(`${API_URL}/planchas`, { headers }).catch(() => null),
@@ -71,7 +79,6 @@ export const DashboardPage: React.FC = () => {
         fetch(`${API_URL}/resultados`, { headers }).catch(() => null),
       ]);
 
-      // 1. Procesar Vecinos
       if (resVecinos && resVecinos.ok) {
         const dataVecinos = await resVecinos.json();
         const listaVecinos = Array.isArray(dataVecinos) ? dataVecinos : (dataVecinos.data || []);
@@ -80,7 +87,6 @@ export const DashboardPage: React.FC = () => {
         setTotalVecinos(0);
       }
 
-      // 2. Procesar Planchas (Excluyendo Nulos y Blancos)
       if (resPlanchas && resPlanchas.ok) {
         const dataPlanchas = await resPlanchas.json();
         const listaPlanchas = Array.isArray(dataPlanchas) ? dataPlanchas : (dataPlanchas.data || []);
@@ -95,7 +101,6 @@ export const DashboardPage: React.FC = () => {
         setTotalPlanchas(0);
       }
 
-      // 3. Procesar Votantes / Votación
       let listaVotos: any[] = [];
       if (resVotos && resVotos.ok) {
         const dataVotos = await resVotos.json();
@@ -114,7 +119,6 @@ export const DashboardPage: React.FC = () => {
         setTotalVotantes(0);
       }
 
-      // 4. Procesar Resultados de Votación
       if (resResultados && resResultados.ok) {
         const dataResultados = await resResultados.json();
         const listaRes = Array.isArray(dataResultados) ? dataResultados : (dataResultados.data || []);
@@ -136,12 +140,12 @@ export const DashboardPage: React.FC = () => {
   };
 
   const kpiCards = [
-    { title: 'Registro de Vecinos', path: '/vecinos', description: 'Gestiona el padrón de vecinos.', value: totalVecinos, icon: UserPlus, color: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-600', isTextLong: false },
-    { title: 'Registro de Planchas', path: '/planchas', description: 'Administra las planchas participantes.', value: totalPlanchas, icon: Building2, color: 'bg-sky-100 text-sky-600', iconColor: 'text-sky-600', isTextLong: false },
+    { title: 'Registro de Vecinos', path: '/vecinos', description: 'Consulta el padrón de vecinos.', value: totalVecinos, icon: UserPlus, color: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-600', isTextLong: false },
+    { title: 'Registro de Planchas', path: '/planchas', description: 'Visualiza las planchas participantes.', value: totalPlanchas, icon: Building2, color: 'bg-sky-100 text-sky-600', iconColor: 'text-sky-600', isTextLong: false },
     { 
       title: 'Registro de Votación', 
       path: '/votacion', 
-      description: 'Controla el proceso de votación.', 
+      description: 'Supervisa el proceso de votación.', 
       value: totalVotantes, 
       icon: MailCheck, 
       color: 'bg-orange-100 text-orange-600', 
@@ -169,26 +173,10 @@ export const DashboardPage: React.FC = () => {
   const planchasRegistradas = Number(totalPlanchas) > 0;
 
   const electoralProcessSteps = [
-    { 
-      name: 'Padrón', 
-      status: padronRegistrado ? 'completed' : 'pending', 
-      icon: padronRegistrado ? CheckCircle : Loader2 
-    },
-    { 
-      name: 'Planchas', 
-      status: planchasRegistradas ? 'completed' : 'pending', 
-      icon: planchasRegistradas ? CheckCircle : Loader2 
-    },
-    { 
-      name: 'Votación', 
-      status: (votacionRegistrada || resultadosRegistrados) ? 'completed' : 'pending', 
-      icon: (votacionRegistrada || resultadosRegistrados) ? CheckCircle : Loader2 
-    },
-    { 
-      name: 'Resultados', 
-      status: resultadosRegistrados ? 'completed' : 'pending', 
-      icon: resultadosRegistrados ? CheckCircle : Loader2 
-    },
+    { name: 'Padrón', status: padronRegistrado ? 'completed' : 'pending', icon: padronRegistrado ? CheckCircle : Loader2 },
+    { name: 'Planchas', status: planchasRegistradas ? 'completed' : 'pending', icon: planchasRegistradas ? CheckCircle : Loader2 },
+    { name: 'Votación', status: (votacionRegistrada || resultadosRegistrados) ? 'completed' : 'pending', icon: (votacionRegistrada || resultadosRegistrados) ? CheckCircle : Loader2 },
+    { name: 'Resultados', status: resultadosRegistrados ? 'completed' : 'pending', icon: resultadosRegistrados ? CheckCircle : Loader2 },
   ];
 
   const getStepClass = (status: string) => {
@@ -211,7 +199,7 @@ export const DashboardPage: React.FC = () => {
                <div className="h-20 w-20 bg-amber-500 rounded-full flex items-center justify-center font-bold text-white text-xs flex-shrink-0">PV</div>
               <div className="flex flex-col">
                 <span className="text-[11px] font-extrabold text-sky-300 tracking-tight leading-tight">PADRÓN VECINAL</span>
-                <span className="text-[8px] text-neutral-400 tracking-wider"></span>
+                <span className="text-[8px] text-neutral-400 tracking-wider">{isOperador ? 'Operador de Consultas' : 'Administrador'}</span>
               </div>
             </div>
           </div>
@@ -230,19 +218,21 @@ export const DashboardPage: React.FC = () => {
                 ))}
                 </ul>
               </div>
-              <div>
-                 <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Configuración</h2>
-                <ul className="space-y-0.5">
-                    {configItems.map((item) => (
-                        <li key={item.name}>
-                          <Link to={item.path} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:bg-neutral-700/50">
-                              <item.icon className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
-                              <span className="truncate">{item.name}</span>
-                          </Link>
-                        </li>
-                    ))}
-                </ul>
-              </div>
+              {configItems.length > 0 && (
+                <div>
+                   <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Configuración</h2>
+                  <ul className="space-y-0.5">
+                      {configItems.map((item) => (
+                          <li key={item.name}>
+                            <Link to={item.path} className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-300 hover:bg-neutral-700/50">
+                                <item.icon className="h-3.5 w-3.5 text-neutral-400 flex-shrink-0" />
+                                <span className="truncate">{item.name}</span>
+                            </Link>
+                          </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
           </nav>
 
           <div className="px-3 py-2.5 border-t border-neutral-700 text-center">
@@ -267,8 +257,8 @@ export const DashboardPage: React.FC = () => {
                     <FileText className="h-5 w-5 text-neutral-500"/>
                 </div>
                 <div className="flex items-center gap-2 border-l border-neutral-200 pl-4">
-                    <span className="text-xs font-medium text-neutral-900">{user?.nombre || 'Administrador'}</span>
-                    <button onClick={handleLogout} className="text-neutral-500 hover:text-red-600 p-1">
+                    <span className="text-xs font-medium text-neutral-900">{user?.nombre || (isOperador ? 'Operador' : 'Administrador')}</span>
+                    <button onClick={handleLogout} className="text-neutral-500 hover:text-red-600 p-1" title="Cerrar sesión">
                        <LogOut className="h-4 w-4" />
                     </button>
                 </div>
@@ -279,8 +269,10 @@ export const DashboardPage: React.FC = () => {
         <main className="flex-1 p-5 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 rounded-xl shadow-sm border border-neutral-100">
             <div>
-                <h2 className="text-xl font-bold text-neutral-950">Bienvenido, {user?.nombre || 'Administrador'}</h2>
-                <p className="text-xs text-neutral-600 mt-0.5">Sistema de Padrón Vecinal y Proceso Electoral</p>
+                <h2 className="text-xl font-bold text-neutral-950">Bienvenido, {user?.nombre || (isOperador ? 'Operador' : 'Administrador')}</h2>
+                <p className="text-xs text-neutral-600 mt-0.5">
+                  {isOperador ? 'Modo de Consulta - Padrón Vecinal y Proceso Electoral' : 'Sistema de Padrón Vecinal y Proceso Electoral'}
+                </p>
             </div>
             <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 px-4 py-2.5 rounded-lg text-xs">
                 <CalendarDays className="h-8 w-8 text-[#1e40af]" />
@@ -307,7 +299,7 @@ export const DashboardPage: React.FC = () => {
                       <p className="text-[11px] text-neutral-500 line-clamp-1">{card.description}</p>
                    </div>
                     <Link to={card.path} className={`flex items-center gap-1 text-[11px] font-semibold ${card.iconColor} hover:underline`}>
-                        Ir al módulo <ChevronRight className="h-3.5 w-3.5" />
+                        {isOperador ? 'Consultar módulo' : 'Ir al módulo'} <ChevronRight className="h-3.5 w-3.5" />
                     </Link>
                 </div>
             ))}
