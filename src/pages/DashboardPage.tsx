@@ -18,18 +18,30 @@ import {
   MailCheck,
   Building2,
   Info,
-  Briefcase
+  Briefcase,
+  Lock,
+  Clock
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// =====================================================================
+// CALENDARIO ELECTORAL / CRONOGRAMA (Modificable según tus fechas límite)
+// =====================================================================
+const CRONOGRAMA_ELECTORAL = {
+  padron: { inicio: new Date('2026-01-01T00:00:00'), fin: new Date('2026-05-31T23:59:59') },
+  planchas: { inicio: new Date('2026-06-01T00:00:00'), fin: new Date('2026-07-15T23:59:59') },
+  votacion: { inicio: new Date('2026-07-16T00:00:00'), fin: new Date('2026-07-16T23:59:59') },
+  resultados: { inicio: new Date('2026-07-17T00:00:00'), fin: new Date('2026-12-31T23:59:59') },
+};
+
 const initialMenuItems = [
-  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, current: true },
-  { name: 'Registro de Vecinos', path: '/vecinos', icon: Users, current: false },
-  { name: 'Registro de Planchas', path: '/planchas', icon: ClipboardList, current: false },
-  { name: 'Registro de Votación', path: '/votacion', icon: CheckSquare, current: false },
-  { name: 'Resultados', path: '/resultados', icon: BarChart3, current: false },
-  { name: 'Reportes', path: '/reportes', icon: FileText, current: false },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard, current: true, fase: 'dashboard' },
+  { name: 'Registro de Vecinos', path: '/vecinos', icon: Users, current: false, fase: 'padron' },
+  { name: 'Registro de Planchas', path: '/planchas', icon: ClipboardList, current: false, fase: 'planchas' },
+  { name: 'Registro de Votación', path: '/votacion', icon: CheckSquare, current: false, fase: 'votacion' },
+  { name: 'Resultados', path: '/resultados', icon: BarChart3, current: false, fase: 'resultados' },
+  { name: 'Reportes', path: '/reportes', icon: FileText, current: false, fase: 'resultados' },
 ];
 
 const initialConfigItems = [
@@ -42,25 +54,31 @@ export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Validación exacta basada en tu Prisma (RolUsuario: administrador, operador_consultas, vecino)
+  // Validación de roles de Prisma (RolUsuario: administrador, operador_consultas, vecino)
   const userRole = (user as any)?.rol || '';
   const isOperador = userRole === 'operador_consultas';
 
-  // Filtrar elementos de configuración si es operador (oculta tanto 'Cargos' como 'Usuarios')
   const menuItems = initialMenuItems;
-  const configItems = isOperador 
-    ? [] // Si es operador, la sección de configuración completa desaparece
-    : initialConfigItems;
+  const configItems = isOperador ? [] : initialConfigItems;
 
-  // Estados dinámicos para los contadores y mensajes
+  // Estados dinámicos
   const [totalVecinos, setTotalVecinos] = useState<string | number>('...');
   const [totalPlanchas, setTotalPlanchas] = useState<string | number>('...');
-  
   const [votacionRegistrada, setVotacionRegistrada] = useState<boolean>(false);
   const [totalVotantes, setTotalVotantes] = useState<string | number>('...');
-
   const [resultadosRegistrados, setResultadosRegistrados] = useState<boolean>(false);
   const [totalResultados, setTotalResultados] = useState<string | number>('--');
+
+  const hoy = new Date();
+
+  // Función para validar si una fase está activa, cerrada o próxima según la fecha
+  const verificarEstadoFase = (faseKey: string) => {
+    const fase = CRONOGRAMA_ELECTORAL[faseKey as keyof typeof CRONOGRAMA_ELECTORAL];
+    if (!fase) return 'activo';
+    if (hoy < fase.inicio) return 'proximo';
+    if (hoy > fase.fin) return 'cerrado';
+    return 'activo';
+  };
 
   useEffect(() => {
     cargarDatosDashboard();
@@ -90,12 +108,10 @@ export const DashboardPage: React.FC = () => {
       if (resPlanchas && resPlanchas.ok) {
         const dataPlanchas = await resPlanchas.json();
         const listaPlanchas = Array.isArray(dataPlanchas) ? dataPlanchas : (dataPlanchas.data || []);
-        
         const planchasReales = listaPlanchas.filter((p: any) => {
           const nombre = (p.nombreFrente || p.nombre || '').toLowerCase();
           return !nombre.includes('nulo') && !nombre.includes('blanco');
         });
-
         setTotalPlanchas(planchasReales.length);
       } else {
         setTotalPlanchas(0);
@@ -122,7 +138,6 @@ export const DashboardPage: React.FC = () => {
       if (resResultados && resResultados.ok) {
         const dataResultados = await resResultados.json();
         const listaRes = Array.isArray(dataResultados) ? dataResultados : (dataResultados.data || []);
-        
         if (listaRes.length > 0) {
           setResultadosRegistrados(true);
           setTotalResultados("Resultados generados");
@@ -139,9 +154,36 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
+  const padronEstado = verificarEstadoFase('padron');
+  const planchasEstado = verificarEstadoFase('planchas');
+  const votacionEstado = verificarEstadoFase('votacion');
+  const resultadosEstado = verificarEstadoFase('resultados');
+
   const kpiCards = [
-    { title: 'Registro de Vecinos', path: '/vecinos', description: 'Consulta el padrón de vecinos.', value: totalVecinos, icon: UserPlus, color: 'bg-emerald-100 text-emerald-600', iconColor: 'text-emerald-600', isTextLong: false },
-    { title: 'Registro de Planchas', path: '/planchas', description: 'Visualiza las planchas participantes.', value: totalPlanchas, icon: Building2, color: 'bg-sky-100 text-sky-600', iconColor: 'text-sky-600', isTextLong: false },
+    { 
+      title: 'Registro de Vecinos', 
+      path: '/vecinos', 
+      description: 'Consulta el padrón de vecinos.', 
+      value: totalVecinos, 
+      icon: UserPlus, 
+      color: 'bg-emerald-100 text-emerald-600', 
+      iconColor: 'text-emerald-600', 
+      isTextLong: false,
+      fase: 'padron',
+      estadoFase: padronEstado
+    },
+    { 
+      title: 'Registro de Planchas', 
+      path: '/planchas', 
+      description: 'Visualiza las planchas participantes.', 
+      value: totalPlanchas, 
+      icon: Building2, 
+      color: 'bg-sky-100 text-sky-600', 
+      iconColor: 'text-sky-600', 
+      isTextLong: false,
+      fase: 'planchas',
+      estadoFase: planchasEstado
+    },
     { 
       title: 'Registro de Votación', 
       path: '/votacion', 
@@ -150,7 +192,9 @@ export const DashboardPage: React.FC = () => {
       icon: MailCheck, 
       color: 'bg-orange-100 text-orange-600', 
       iconColor: 'text-orange-600',
-      isTextLong: votacionRegistrada 
+      isTextLong: votacionRegistrada,
+      fase: 'votacion',
+      estadoFase: votacionEstado
     },
     { 
       title: 'Resultados', 
@@ -160,7 +204,9 @@ export const DashboardPage: React.FC = () => {
       icon: BarChart3, 
       color: 'bg-violet-100 text-violet-600', 
       iconColor: 'text-violet-600',
-      isTextLong: resultadosRegistrados 
+      isTextLong: resultadosRegistrados,
+      fase: 'resultados',
+      estadoFase: resultadosEstado
     },
   ];
 
@@ -172,11 +218,28 @@ export const DashboardPage: React.FC = () => {
   const padronRegistrado = Number(totalVecinos) > 0;
   const planchasRegistradas = Number(totalPlanchas) > 0;
 
+  // El workflow se actualiza en base al calendario y estado real
   const electoralProcessSteps = [
-    { name: 'Padrón', status: padronRegistrado ? 'completed' : 'pending', icon: padronRegistrado ? CheckCircle : Loader2 },
-    { name: 'Planchas', status: planchasRegistradas ? 'completed' : 'pending', icon: planchasRegistradas ? CheckCircle : Loader2 },
-    { name: 'Votación', status: (votacionRegistrada || resultadosRegistrados) ? 'completed' : 'pending', icon: (votacionRegistrada || resultadosRegistrados) ? CheckCircle : Loader2 },
-    { name: 'Resultados', status: resultadosRegistrados ? 'completed' : 'pending', icon: resultadosRegistrados ? CheckCircle : Loader2 },
+    { 
+      name: 'Padrón', 
+      status: padronEstado === 'cerrado' || padronRegistrado ? 'completed' : padronEstado === 'proximo' ? 'pending' : 'in_process', 
+      icon: padronEstado === 'cerrado' || padronRegistrado ? CheckCircle : padronEstado === 'proximo' ? Loader2 : CheckCircle 
+    },
+    { 
+      name: 'Planchas', 
+      status: planchasEstado === 'cerrado' || planchasRegistradas ? 'completed' : planchasEstado === 'proximo' ? 'pending' : 'in_process', 
+      icon: planchasEstado === 'cerrado' || planchasRegistradas ? CheckCircle : Loader2 
+    },
+    { 
+      name: 'Votación', 
+      status: votacionEstado === 'cerrado' || votacionRegistrada ? 'completed' : votacionEstado === 'proximo' ? 'pending' : 'in_process', 
+      icon: votacionEstado === 'cerrado' || votacionRegistrada ? CheckCircle : Loader2 
+    },
+    { 
+      name: 'Resultados', 
+      status: resultadosEstado === 'cerrado' || resultadosRegistrados ? 'completed' : 'pending', 
+      icon: resultadosEstado === 'cerrado' || resultadosRegistrados ? CheckCircle : Loader2 
+    },
   ];
 
   const getStepClass = (status: string) => {
@@ -206,18 +269,34 @@ export const DashboardPage: React.FC = () => {
 
           <nav className="flex-grow px-3 py-3 space-y-3">
               <div>
-                <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Menú</h2>
+                <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Menú del Proceso</h2>
                 <ul className="space-y-0.5">
-                {menuItems.map((item) => (
-                    <li key={item.name}>
-                      <Link to={item.path} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${item.current ? 'bg-[#1e40af] text-white shadow-inner' : 'text-neutral-300 hover:bg-neutral-700/50'}`}>
-                          <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="truncate">{item.name}</span>
-                      </Link>
-                    </li>
-                ))}
+                {menuItems.map((item) => {
+                    const estadoFase = item.fase ? verificarEstadoFase(item.fase) : 'activo';
+                    const estaBloqueadoPorFecha = estadoFase === 'proximo';
+
+                    return (
+                        <li key={item.name}>
+                          {estaBloqueadoPorFecha ? (
+                            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-500 bg-neutral-800/40 cursor-not-allowed">
+                                <div className="flex items-center gap-2.5">
+                                    <item.icon className="h-3.5 w-3.5 flex-shrink-0 text-neutral-600" />
+                                    <span className="truncate">{item.name}</span>
+                                </div>
+                                <span className="text-[9px] bg-neutral-700 text-neutral-300 px-1.5 py-0.5 rounded">Pronto</span>
+                            </div>
+                          ) : (
+                            <Link to={item.path} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${item.current ? 'bg-[#1e40af] text-white shadow-inner' : 'text-neutral-300 hover:bg-neutral-700/50'}`}>
+                                <item.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span className="truncate">{item.name}</span>
+                            </Link>
+                          )}
+                        </li>
+                    );
+                })}
                 </ul>
               </div>
+
               {configItems.length > 0 && (
                 <div>
                    <h2 className="px-2 mb-1.5 text-[9px] font-semibold uppercase text-neutral-400 tracking-wider">Configuración</h2>
@@ -277,32 +356,49 @@ export const DashboardPage: React.FC = () => {
             <div className="flex items-center gap-3 bg-neutral-50 border border-neutral-200 px-4 py-2.5 rounded-lg text-xs">
                 <CalendarDays className="h-8 w-8 text-[#1e40af]" />
                 <div>
-                    <p className="text-neutral-500">Fecha actual</p>
-                    <p className="font-bold text-neutral-950">{new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                    <p className="text-neutral-500">Fecha del Sistema</p>
+                    <p className="font-bold text-neutral-950">{hoy.toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                 </div>
             </div>
           </div>
 
+          {/* Tarjetas KPI con restricciones de fechas */}
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {kpiCards.map((card) => (
-                <div key={card.title} className="bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex flex-col justify-between gap-3">
+            {kpiCards.map((card) => {
+              const esProximo = card.estadoFase === 'proximo';
+              const esCerrado = card.estadoFase === 'cerrado';
+
+              return (
+                <div key={card.title} className={`bg-white p-4 rounded-xl shadow-sm border border-neutral-100 flex flex-col justify-between gap-3 relative overflow-hidden ${esProximo ? 'opacity-75 bg-neutral-50/50' : ''}`}>
                    <div className="flex items-center justify-between">
                       <div className={`p-2.5 rounded-lg ${card.color}`}>
                           <card.icon className="h-5 w-5" />
                       </div>
                       <p className={`${card.isTextLong ? 'text-sm font-bold text-right leading-tight max-w-[130px] ' + (card.title.includes('Votación') ? 'text-orange-700' : 'text-violet-700') : 'text-2xl font-extrabold text-neutral-950'}`}>
-                        {card.value}
+                        {esProximo ? <Clock className="h-5 w-5 text-neutral-400 inline" /> : card.value}
                       </p>
                    </div>
                    <div>
-                      <h3 className="text-xs font-semibold text-neutral-950">{card.title}</h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-neutral-950">{card.title}</h3>
+                        {esProximo && <span className="text-[10px] bg-amber-100 text-amber-800 font-medium px-1.5 py-0.5 rounded">Próximamente</span>}
+                        {esCerrado && <span className="text-[10px] bg-neutral-200 text-neutral-700 font-medium px-1.5 py-0.5 rounded">Finalizado</span>}
+                      </div>
                       <p className="text-[11px] text-neutral-500 line-clamp-1">{card.description}</p>
                    </div>
+
+                   {esProximo ? (
+                     <div className="flex items-center gap-1 text-[11px] font-semibold text-neutral-400 cursor-not-allowed">
+                       Módulo no disponible <Lock className="h-3 w-3 ml-auto" />
+                     </div>
+                   ) : (
                     <Link to={card.path} className={`flex items-center gap-1 text-[11px] font-semibold ${card.iconColor} hover:underline`}>
                         {isOperador ? 'Consultar módulo' : 'Ir al módulo'} <ChevronRight className="h-3.5 w-3.5" />
                     </Link>
+                   )}
                 </div>
-            ))}
+              );
+            })}
           </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-3 gap-5 pb-2">
@@ -313,7 +409,7 @@ export const DashboardPage: React.FC = () => {
                         <div key={card.title} className="flex items-center justify-between text-xs border-b border-neutral-100 pb-2.5 last:border-b-0 last:pb-0">
                             <span className="text-neutral-700">{card.title}</span>
                             <span className={`font-bold ${card.isTextLong ? (card.title.includes('Votación') ? 'text-orange-700 text-[10px]' : 'text-violet-700 text-[10px]') : 'text-neutral-950'}`}>
-                              {card.value}
+                              {card.estadoFase === 'proximo' ? 'No iniciado' : card.value}
                             </span>
                         </div>
                     ))}
@@ -321,7 +417,7 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="xl:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-neutral-100 flex flex-col justify-between">
-                <h2 className="text-sm font-bold text-neutral-950 mb-4">Estado del Proceso Electoral</h2>
+                <h2 className="text-sm font-bold text-neutral-950 mb-4">Estado del Proceso Electoral (Cronograma)</h2>
                 <div className="flex items-center justify-between max-w-xl mx-auto mb-4 w-full">
                     {electoralProcessSteps.map((step) => (
                         <div key={step.name} className={`flex flex-col items-center gap-1.5 ${getStepClass(step.status)}`}>
@@ -335,7 +431,7 @@ export const DashboardPage: React.FC = () => {
                 <div className="bg-sky-50 border border-sky-200 p-3 rounded-lg flex items-center gap-3">
                     <Info className="h-5 w-5 text-sky-600 flex-shrink-0" />
                     <p className="text-xs text-sky-700">
-                        <span className="font-bold">Proceso Electoral 2026:</span> {resultadosRegistrados ? 'Resultados generados y proceso electoral finalizado.' : votacionRegistrada ? 'Votación registrada. En etapa de generación de resultados.' : 'En etapa de registro de votación.'}
+                        <span className="font-bold">Calendario Electoral activo:</span> Las fases se habilitan o bloquean de forma automática según el cronograma de fechas establecido para las elecciones 2026.
                     </p>
                 </div>
             </div>
