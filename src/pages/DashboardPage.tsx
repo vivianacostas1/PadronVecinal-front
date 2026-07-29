@@ -46,10 +46,10 @@ export const DashboardPage: React.FC = () => {
   const userRole = (user as any)?.rol || '';
   const isOperador = userRole === 'operador_consultas';
 
-  // Filtrar menús si es operador (se oculta Configuración de Usuarios)
+  // Filtrar elementos de configuración si es operador (oculta tanto 'Cargos' como 'Usuarios')
   const menuItems = initialMenuItems;
   const configItems = isOperador 
-    ? initialConfigItems.filter(item => item.name !== 'Usuarios') 
+    ? [] // Si es operador, la sección de configuración completa desaparece
     : initialConfigItems;
 
   // Estados dinámicos para los contadores y mensajes
